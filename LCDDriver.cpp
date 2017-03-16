@@ -368,43 +368,52 @@ void LCDDriver::Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor
 
     stl = strlen( str );
 
-    /*if ( x == RIGHT )
-        x = GetWidth() - ( stl * _font->Width );
-    if ( x == CENTER )
-        x = ( GetWidth() - ( stl * _font->Width ) ) / 2;*/
-
     for ( i = 0; i < stl; i++ )
         PrintChar( *str++, x + ( i * ( _font->Width ) ), y, fgColor );    
 }
 
-void LCDDriver::DisplayBMP(uint16_t x,uint16_t y,BMP *bmpdata)
+void LCDDriver::DisplayBMP(uint16_t x,uint16_t y,unsigned char *buffer)
 {
-    int line_size;
-    int maxx,maxy,i,j;
-     
-    if (bmpdata->dib_data.Width>320)
-        maxx=320;
-    else
-        maxx=bmpdata->dib_data.Width;
-
-    if (bmpdata->dib_data.Height>240)
-        maxy=240;
-    else
-        maxy=bmpdata->dib_data.Height;  
-        
-    line_size=((bmpdata->dib_data.bpp*bmpdata->dib_data.Width+31)/32)*4;  
-        
-    for (i=0;i<maxy;i++)
+    uint32_t width,height;
+    uint16_t bpp;
+    uint32_t linesize,pos,start_pos,raw_bitmapsz;
+    uint32_t xx,yy;
+    uint32_t rest,padding;
+    uint16_t color;
+	uint8_t r,g,b;
+    
+    width=*((uint32_t*)(buffer+0x12));
+    height=*((uint32_t*)(buffer+0x16));
+    bpp=*((uint16_t*)(buffer+0x1C));
+    raw_bitmapsz=*((uint32_t*)(buffer+0x22));
+    start_pos=*((uint32_t*)(buffer+0x0A));
+    
+    linesize=width*(bpp/8);
+    rest=linesize%4;
+    if (rest)
     {
-        for (j=0;j<maxx;j++)
+        padding=4-rest;
+        linesize+=padding;
+    }
+    else 
+        padding=0;	
+    pos=raw_bitmapsz-linesize;
+    
+    for (yy=y;yy<y+height-2;yy++)
+    {
+        for (xx=x;xx<x+width;xx++)
         {
-            switch (bmpdata->dib_data.bpp)
+            b=((uint8_t*)(buffer+start_pos+pos))[0];
+			g=((uint8_t*)(buffer+start_pos+pos))[1];
+			r=((uint8_t*)(buffer+start_pos+pos))[2];			
+            Pixel(xx,yy,RGB(r,g,b));
+            if ((pos+padding)%linesize==0)
             {
-                case 16:
-                    Pixel(x+j,y+i,((uint16_t*)((uint8_t*)bmpdata+bmpdata->bmpoffset+(bmpdata->dib_data.Height-1-i)*line_size))[j]);
-                break;
-            }                   
-        }
-    }                
+              pos+=padding;					
+              pos-=2*linesize;	
+            }				
+            pos+=bpp/8;
+        }		
+    }
 }
 

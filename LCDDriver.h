@@ -135,7 +135,7 @@ class LCDDriver{
         
         void PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor = -1);
         void Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor = -1);
-		void DisplayBMP(uint16_t x,uint16_t y,BMP *bmpdata);
+		void DisplayBMP(uint16_t x,uint16_t y,unsigned char *buffer);
 };
 
 #endif

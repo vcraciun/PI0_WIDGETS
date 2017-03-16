@@ -53,7 +53,26 @@ int main(void)
     lcd->Print("Salut DAN",0,100,BLACK);
     delay(5000);
     
-    
+	FILE *input_fd = fopen ("poza.bmp", "r");	
+	unsigned char *buffer;
+    if (input_fd == NULL) {
+		printf("open failed\n");
+        return 0;
+    }
+	fseek(input_fd,0,SEEK_END);
+	int size=ftell(input_fd);
+	printf("Size = %d\n",size);	
+	rewind(input_fd);
+	buffer = (unsigned char*)malloc(size);
+	memset(buffer,0,size);
+	printf("Alloc: %08X\n",buffer);
+    int ret_in = fread (buffer, 1, size, input_fd);
+	printf("read: %d\n",ret_in);
+	fclose(input_fd);
+	printf("display BMP\n");
+	lcd->DisplayBMP(0,0,buffer);
+	printf("free buffer\n");
+	free(buffer);
     /*for (i=0;i<sizeof(color)/2;i++)
     {
         lcd->RectFill(50,50,250,140,color[i]);

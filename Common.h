@@ -6,5 +6,9 @@
 #include <time.h>
 #include <wiringPi.h>
 #include <string.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #endif
