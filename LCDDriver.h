@@ -112,6 +112,8 @@ class LCDDriver{
         uint16_t resx;
         uint16_t resy;
         font_t*  _font;
+        
+        uint8_t PinArray[16];
 
     public:
         static LCDDriver *GetInstance(uint32_t orientation = PORTRAIT);
@@ -133,9 +135,9 @@ class LCDDriver{
 		uint8_t GetFontWidth();
         uint8_t GetFontHeight();
         
-        void PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor = -1);
-        void Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor = -1);
-		void DisplayBMP(uint16_t x,uint16_t y,unsigned char *buffer);
+        void PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor, uint16_t bgColor);
+        void Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor, uint16_t bgColor);
+		void DisplayBMP(uint16_t x,uint16_t y,uint8_t *buffer);
 };
 
 #endif

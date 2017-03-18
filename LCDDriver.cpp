@@ -11,6 +11,8 @@ LCDDriver::LCDDriver(uint32_t orient)
     delay(50);
     LCDInit();
     delay(50);
+    //disable READ
+    digitalWrite(RD,HIGH); 
 }
 
 LCDDriver::~LCDDriver(){}
@@ -45,7 +47,24 @@ void LCDDriver::PortSetup()
     pinMode(RS, OUTPUT);
     pinMode(WR, OUTPUT);
     pinMode(RD, OUTPUT);
-    pinMode(RESET, OUTPUT);  
+    pinMode(RESET, OUTPUT); 
+
+    PinArray[0] = D0;
+    PinArray[1] = D1;
+    PinArray[2] = D2;
+    PinArray[3] = D3;
+    PinArray[4] = D4;
+    PinArray[5] = D5;
+    PinArray[6] = D6;
+    PinArray[7] = D7;
+    PinArray[8] = D8;
+    PinArray[9] = D9;
+    PinArray[10] = D10;
+    PinArray[11] = D11;
+    PinArray[12] = D12;
+    PinArray[13] = D13;
+    PinArray[14] = D14;
+    PinArray[15] = D15;
 }
 
 void LCDDriver::LCDInit()
@@ -67,7 +86,7 @@ void LCDDriver::LCDInit()
     WriteCmdData(0x0001,0x2B3F);
     WriteCmdData(0x0002,0x0600);
     WriteCmdData(0x0010,0x0000);
-    WriteCmdData(0x0011,0x6070);
+    WriteCmdData(0x0011,0x6070); //left->right, up->down continous fill
     WriteCmdData(0x0005,0x0000);
     WriteCmdData(0x0006,0x0000);
     WriteCmdData(0x0016,0xEF1C);
@@ -108,7 +127,7 @@ void LCDDriver::WriteCmd(uint16_t cmd)
     int bits[16] = {D0,D1,D2,D3,D4,D5,D6,D7,D8,D9,D10,D11,D12,D13,D14,D15};
     int i;
     
-    digitalWrite(RD,HIGH);    
+    //digitalWrite(RD,HIGH);    
     digitalWrite(RS,LOW);
     for (i=0;i<16;i++)
     {
@@ -124,7 +143,7 @@ void LCDDriver::WriteData(uint16_t data)
     int bits[16] = {D0,D1,D2,D3,D4,D5,D6,D7,D8,D9,D10,D11,D12,D13,D14,D15};
     int i;
     
-    digitalWrite(RD,HIGH);
+    //digitalWrite(RD,HIGH);
     digitalWrite(RS,HIGH);
     for (i=0;i<16;i++)
     {
@@ -181,7 +200,7 @@ void LCDDriver::RectFill(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_
 	for( i = 0; i < w*h; i++ )		
     {
         digitalWrite(WR,LOW); 
-        digitalWrite(WR,HIGH); 
+        digitalWrite(WR,HIGH);
     }
     digitalWrite(CS,HIGH);        
 }
@@ -338,7 +357,7 @@ uint8_t LCDDriver::GetFontHeight()
     return 0;    
 }
 
-void LCDDriver::PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor)
+/*void LCDDriver::PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor)
 {
     uint8_t i, ch;
     uint16_t j,k;   
@@ -359,10 +378,48 @@ void LCDDriver::PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor)
             }
             position++;
         }
-    }    
+    }        
+}*/
+
+void LCDDriver::PrintChar( char c, uint16_t x, uint16_t y, uint16_t fgColor, uint16_t bgColor)
+{
+    uint8_t i, ch;
+    uint16_t j,k,q;   
+    int16_t position = _font->Position[ c - _font->Offset ];
+    uint16_t color;
+    uint16_t *representation;
+
+	if ( position == -1 ) 
+		position = 0;
+    
+    representation = (uint16_t*)malloc(_font->Width*_font->Height*sizeof(uint16_t));
+    q=0;
+    for ( j = 0; j < _font->Height; j++ )
+    {
+        for (k=0;k<_font->Width/8;k++)
+        {
+            ch = _font->Data[ position ];
+            for ( i = 0; i < 8; i++ )
+            {            
+                if ( ( ch & ( 1 << ( 7 - i ) ) ) != 0 ) 
+                    representation[q++] = fgColor;
+                else
+                    representation[q++] = bgColor;;
+            }
+            position++;
+        }
+    }        
+        
+    digitalWrite(CS,LOW);        
+    LCDSetAddress(x,y,x+_font->Width-1,y+_font->Height-1);
+    for (i=0;i<_font->Width * _font->Height;i++)
+        WriteData(representation[i]);
+    digitalWrite(CS,HIGH);      
+
+    free(representation);
 }
 
-void LCDDriver::Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor)
+/*void LCDDriver::Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor)
 {
     int stl, i;
 
@@ -370,9 +427,70 @@ void LCDDriver::Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor
 
     for ( i = 0; i < stl; i++ )
         PrintChar( *str++, x + ( i * ( _font->Width ) ), y, fgColor );    
+}*/
+
+//functioneaza corect cu afisare left->right, top->down, PORTRAIT mode
+void LCDDriver::Print( const char *str, uint16_t x, uint16_t y, uint16_t fgColor, uint16_t bgColor)
+{
+    int stl, i,j,k,l,q;
+    char ch;
+    uint16_t positions[30]; 
+    uint16_t color;
+
+    stl = strlen( str );
+    
+    //check if string is larger than XRES
+    if (x+stl*_font->Width>=RESX)
+        stl = stl - (x+stl*_font->Width - RESX)/_font->Width;
+    if (y+_font->Height >= RESY)
+        return;
+    
+    for (i=0;i<stl;i++)
+        positions[i] = (_font->Position[str[i]-_font->Offset]==-1)?0:_font->Position[str[i]-_font->Offset];
+    
+    digitalWrite(CS,LOW);        
+    LCDSetAddress(x,y,x+stl*_font->Width-1,y+_font->Height-1);
+    digitalWrite(RS,HIGH);          
+    for (i=0;i<_font->Height;i++)   //for each full text pixel line
+    {
+        for (j=0;j<stl;j++) //for each different char
+        {                 
+            for (k=0;k<_font->Width/8;k++)  //for each line in font
+            {                              
+                ch = _font->Data[positions[j]];
+                for ( l = 0; l < 8; l++ )
+                {            
+                    if ( ( ch & ( 1 << ( 7 - l ) ) ) != 0 ) 
+                    {
+                        color = fgColor;
+                        for (q=0;q<16;q++)
+                        {
+                            digitalWrite(PinArray[q], (color&1)?HIGH:LOW);
+                            color >>= 1;
+                        }
+                        digitalWrite(WR,LOW);
+                        digitalWrite(WR,HIGH);  
+                    }
+                    else
+                    {
+                        color = bgColor;
+                        for (q=0;q<16;q++)
+                        {
+                            digitalWrite(PinArray[q], (color&1)?HIGH:LOW);
+                            color >>= 1;
+                        }
+                        digitalWrite(WR,LOW);
+                        digitalWrite(WR,HIGH);  
+                    }
+                }
+                positions[j]++;
+            }
+        }
+    }
+    digitalWrite(CS,HIGH);     
 }
 
-void LCDDriver::DisplayBMP(uint16_t x,uint16_t y,unsigned char *buffer)
+void LCDDriver::DisplayBMP(uint16_t x,uint16_t y,uint8_t *buffer)
 {
     uint32_t width,height;
     uint16_t bpp;
@@ -381,14 +499,21 @@ void LCDDriver::DisplayBMP(uint16_t x,uint16_t y,unsigned char *buffer)
     uint32_t rest,padding;
     uint16_t color;
 	uint8_t r,g,b;
-    
+    uint8_t *pixels;
+    int byte_per_pixel;
+    int i;    
+        
     width=*((uint32_t*)(buffer+0x12));
     height=*((uint32_t*)(buffer+0x16));
     bpp=*((uint16_t*)(buffer+0x1C));
     raw_bitmapsz=*((uint32_t*)(buffer+0x22));
     start_pos=*((uint32_t*)(buffer+0x0A));
     
-    linesize=width*(bpp/8);
+    byte_per_pixel = bpp/8;
+    if (!raw_bitmapsz)
+        raw_bitmapsz = width*height*byte_per_pixel;    
+    
+    linesize=width*byte_per_pixel;
     rest=linesize%4;
     if (rest)
     {
@@ -397,23 +522,82 @@ void LCDDriver::DisplayBMP(uint16_t x,uint16_t y,unsigned char *buffer)
     }
     else 
         padding=0;	
-    pos=raw_bitmapsz-linesize;
     
+    pos=raw_bitmapsz-linesize;
+    pixels = buffer+start_pos;   
+    
+    digitalWrite(CS,LOW);        
+    LCDSetAddress(x,y,x+width-1,y+height-1); 
+    digitalWrite(RS,HIGH);    
     for (yy=y;yy<y+height-2;yy++)
     {
         for (xx=x;xx<x+width;xx++)
         {
-            b=((uint8_t*)(buffer+start_pos+pos))[0];
-			g=((uint8_t*)(buffer+start_pos+pos))[1];
-			r=((uint8_t*)(buffer+start_pos+pos))[2];			
-            Pixel(xx,yy,RGB(r,g,b));
+            switch (byte_per_pixel)
+            {
+                case 3:
+                    b=((uint8_t*)(pixels))[pos+0];
+                    g=((uint8_t*)(pixels))[pos+1];
+                    r=((uint8_t*)(pixels))[pos+2];	
+                    color=RGB(r,g,b);
+                    break;
+                case 2:
+                    color = *(uint16_t*)(pixels+pos);
+                    break;
+                default:
+                    continue;
+            }
+
+            for (i=0;i<16;i++)
+            {
+                digitalWrite(PinArray[i], (color&1)?HIGH:LOW);
+                color >>= 1;
+            }
+            digitalWrite(WR,LOW);
+            digitalWrite(WR,HIGH); 
+            
+            pos+=byte_per_pixel;
             if ((pos+padding)%linesize==0)
             {
-              pos+=padding;					
-              pos-=2*linesize;	
-            }				
-            pos+=bpp/8;
+                pos+=padding;					
+                pos-=2*linesize;	
+            }		                        
         }		
     }
+    
+    for (xx=x;xx<x+width;xx++)
+    {
+        switch (byte_per_pixel)
+        {
+            case 3:
+                b=((uint8_t*)(pixels))[pos+0];
+                g=((uint8_t*)(pixels))[pos+1];
+                r=((uint8_t*)(pixels))[pos+2];	
+                color=RGB(r,g,b);
+                break;
+            case 2:
+                color = *(uint16_t*)(pixels+pos);
+                break;
+            default:
+                continue;
+        }
+
+        for (i=0;i<16;i++)
+        {
+            digitalWrite(PinArray[i], (color&1)?HIGH:LOW);
+            color >>= 1;
+        }
+        digitalWrite(WR,LOW);
+        digitalWrite(WR,HIGH); 
+        
+        pos+=byte_per_pixel;
+        if ((pos+padding)%linesize==0)
+        {
+            pos+=padding;					
+            pos-=2*linesize;	
+        }		                        
+    }   
+    digitalWrite(CS,HIGH); 
 }
+
 
